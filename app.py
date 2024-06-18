@@ -48,7 +48,7 @@ def detect_green_areas(image):
 
 def calculate_area(mask, pixel_to_mm_ratio):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    areas = [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) > 1]  # Only consider areas > 1 mm²
+    areas = [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) > 1e7]  # Only consider areas > 1e7 mm²
     return areas
 
 def plot_areas(areas, insect_name):

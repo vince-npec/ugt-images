@@ -48,8 +48,18 @@ def detect_green_areas(image):
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
     return mask
 
-def calculate_area_and_count_leaves(mask, pixel_to_mm_ratio):
+def segment_plants(mask):
+    # Find contours of the entire plant
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    plant_masks = []
+    for cnt in contours:
+        plant_mask = np.zeros_like(mask)
+        cv2.drawContours(plant_mask, [cnt], -1, 255, thickness=cv2.FILLED)
+        plant_masks.append(plant_mask)
+    return plant_masks
+
+def calculate_area_and_count_leaves(plant_mask, pixel_to_mm_ratio):
+    contours, _ = cv2.findContours(plant_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     areas = [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) > 1e7]
     num_leaves = len([cnt for cnt in contours if cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) > 1e7])
     return areas, num_leaves
@@ -85,21 +95,20 @@ def process_images(image_files, pixel_to_mm_ratio):
         st.image(image, caption=f'Uploaded Image: {insect_name}', use_column_width=True)
         
         mask = detect_green_areas(image)
-        areas, num_leaves = calculate_area_and_count_leaves(mask, pixel_to_mm_ratio)
+        plant_masks = segment_plants(mask)
         
-        if insect_name not in all_plants:
-            all_plants[insect_name] = []
-        all_plants[insect_name].extend(areas)
-        
-        for i, area in enumerate(areas):
-            sub_plant_label = f"{image_number}.{i+1}"
-            results.append({"Insect Name": insect_name, f"Sub-Plant {sub_plant_label} Area (mm²)": area, f"Sub-Plant {sub_plant_label} Leaf Count": num_leaves})
-        
-        plot = plot_areas(areas, insect_name)
-        if plot:
-            st.pyplot(plot)
-        else:
-            st.write("No significant areas detected for", insect_name)
+        for plant_index, plant_mask in enumerate(plant_masks):
+            areas, num_leaves = calculate_area_and_count_leaves(plant_mask, pixel_to_mm_ratio)
+            
+            sub_plant_label = f"{image_number}.{plant_index+1}"
+            for i, area in enumerate(areas):
+                results.append({"Insect Name": insect_name, f"Sub-Plant {sub_plant_label} Area (mm²)": area, f"Sub-Plant {sub_plant_label} Leaf Count": num_leaves})
+            
+            plot = plot_areas(areas, insect_name)
+            if plot:
+                st.pyplot(plot)
+            else:
+                st.write("No significant areas detected for", insect_name)
     
     return results, all_plants
 

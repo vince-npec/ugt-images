@@ -48,18 +48,7 @@ def detect_green_areas(image):
 
 def calculate_area(mask, pixel_to_mm_ratio):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    areas = [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) > 500]
-    return areas
-
-def plot_areas(areas, insect_name):
-    plt.figure(figsize=(10, 5))
-    plt.bar(range(len(areas)), areas, color='green')
-    plt.xlabel('Sub-Plant Number')
-    plt.ylabel('Area (mm²)')
-    plt.title(f'Area of Each Sub-Plant for {insect_name}')
-    plt.grid(True)
-    plt.tight_layout()
-    return plt
+    return [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) > 500]
 
 def extract_number_from_filename(filename):
     match = re.search(r'_0*(\d+)_', filename)
@@ -87,7 +76,8 @@ def main():
             areas = calculate_area(mask, pixel_to_mm_ratio)
             
             for i, area in enumerate(areas):
-                results.append({"Insect Name": insect_name, f"Sub-Plant {i+1} Area (mm²)": area})
+                sub_plant_label = f"{image_number}.{i+1}"
+                results.append({"Insect Name": insect_name, f"Sub-Plant {sub_plant_label} Area (mm²)": area})
             
             if areas:
                 plot = plot_areas(areas, insect_name)

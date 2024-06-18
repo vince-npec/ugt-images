@@ -96,15 +96,17 @@ def main():
             else:
                 st.write("No significant areas detected for", insect_name)
         
-        # Plotting comparative graph for all plants
+        # Preparing data for the stacked bar plot
+        df = pd.DataFrame.from_dict(all_plants, orient='index').fillna(0).T
         fig, ax = plt.subplots(figsize=(15, 7))
-        for idx, (name, areas) in enumerate(all_plants.items()):
-            ax.bar(idx, sum(areas), label=name, color=plt.cm.tab20(idx / len(all_plants)))
+        
+        # Plotting stacked bars
+        df.plot(kind='bar', stacked=True, ax=ax, colormap='tab20')
         
         ax.set_xlabel('Insect Name')
         ax.set_ylabel('Total Area (mm²)')
         ax.set_title('Comparative Total Area of Plants Across All Images')
-        ax.legend()
+        ax.legend(title='Insect Name')
         plt.tight_layout()
         st.pyplot(fig)
 

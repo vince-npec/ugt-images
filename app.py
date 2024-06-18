@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
 import re
+import pandas as pd
 
 # Define the mapping from file numbers to insect names
 insect_names = {
@@ -50,16 +51,6 @@ def calculate_area(mask, pixel_to_mm_ratio):
     areas = [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) > 500]
     return areas
 
-def plot_areas(areas, insect_name):
-    plt.figure(figsize=(10, 5))
-    plt.bar(range(len(areas)), areas, color='green')
-    plt.xlabel('Plant Number')
-    plt.ylabel('Area (mm²)')
-    plt.title(f'Area of Each Plant for {insect_name}')
-    plt.grid(True)
-    plt.tight_layout()
-    return plt
-
 def extract_number_from_filename(filename):
     match = re.search(r'_0*(\d+)_', filename)
     if match:
@@ -72,35 +63,42 @@ def main():
     uploaded_files = st.file_uploader("Choose images...", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
     pixel_to_mm_ratio = st.number_input('Enter the pixel to mm ratio:', min_value=0.01, max_value=100.0, value=8.43, step=0.01)
     
-    all_areas = []  # To store areas from all images for cumulative graph
-    names = []  # To store names for labels on cumulative graph
+    results = []  # To store results for table display and download
     
     if uploaded_files and st.button('Analyze'):
         for uploaded_file in uploaded_files:
             image_number = extract_number_from_filename(uploaded_file.name)
             insect_name = insect_names.get(image_number, "Unknown Insect")
-            names.append(insect_name)
             
             image = load_image(uploaded_file)
             st.image(image, caption=f'Uploaded Image: {insect_name}', use_column_width=True)
             
             mask = detect_green_areas(image)
             areas = calculate_area(mask, pixel_to_mm_ratio)
-            all_areas.append(sum(areas))  # Sum areas for each image and append
             
+            results.append({"Insect Name": insect_name, "Total Area (mm²)": sum(areas)})
             if areas:
                 plot = plot_areas(areas, insect_name)
                 st.pyplot(plot)
         
-        # Plot cumulative graph at the end
-        plt.figure(figsize=(15, 7))
-        plt.bar(names, all_areas, color='blue')
-        plt.xlabel('Insect Name')
-        plt.ylabel('Total Area (mm²)')
-        plt.title('Comparative Total Area of Plants Across All Images')
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        st.pyplot()
+        # Display results as a table
+        df = pd.DataFrame(results)
+        st.table(df)
+        
+        # Download buttons for CSV and Excel
+        st.download_button(
+            label="Download data as CSV",
+            data=df.to_csv(index=False),
+            file_name='plant_areas.csv',
+            mime='text/csv',
+        )
+        
+        st.download_button(
+            label="Download data as Excel",
+            data=df.to_excel(index=False),
+            file_name='plant_areas.xlsx',
+            mime='application/vnd.ms-excel'
+        )
 
 if __name__ == '__main__':
     main()

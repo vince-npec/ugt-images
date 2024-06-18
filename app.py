@@ -48,9 +48,11 @@ def detect_green_areas(image):
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
     return mask
 
-def calculate_area(mask, pixel_to_mm_ratio):
+def calculate_area_and_count_leaves(mask, pixel_to_mm_ratio):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    return [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) > 1e7]
+    areas = [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) > 1e7]
+    num_leaves = len([cnt for cnt in contours if cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) > 1e7])
+    return areas, num_leaves
 
 def plot_areas(areas, insect_name):
     if not areas:
@@ -83,7 +85,7 @@ def process_images(image_files, pixel_to_mm_ratio):
         st.image(image, caption=f'Uploaded Image: {insect_name}', use_column_width=True)
         
         mask = detect_green_areas(image)
-        areas = calculate_area(mask, pixel_to_mm_ratio)
+        areas, num_leaves = calculate_area_and_count_leaves(mask, pixel_to_mm_ratio)
         
         if insect_name not in all_plants:
             all_plants[insect_name] = []
@@ -91,7 +93,7 @@ def process_images(image_files, pixel_to_mm_ratio):
         
         for i, area in enumerate(areas):
             sub_plant_label = f"{image_number}.{i+1}"
-            results.append({"Insect Name": insect_name, f"Sub-Plant {sub_plant_label} Area (mm²)": area})
+            results.append({"Insect Name": insect_name, f"Sub-Plant {sub_plant_label} Area (mm²)": area, f"Sub-Plant {sub_plant_label} Leaf Count": num_leaves})
         
         plot = plot_areas(areas, insect_name)
         if plot:

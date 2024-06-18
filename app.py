@@ -76,6 +76,8 @@ def main():
     
     if uploaded_files and st.button('Analyze'):
         all_plants = {}  # Dictionary to store all plant areas by insect name
+        results = []  # List to store results for the table
+        
         for uploaded_file in uploaded_files:
             image_number = extract_number_from_filename(uploaded_file.name)
             insect_name = insect_names.get(image_number, "Unknown Insect")
@@ -90,18 +92,26 @@ def main():
                 all_plants[insect_name] = []
             all_plants[insect_name].extend(areas)
             
+            for i, area in enumerate(areas):
+                sub_plant_label = f"{image_number}.{i+1}"
+                results.append({"Insect Name": insect_name, f"Sub-Plant {sub_plant_label} Area (mm²)": area})
+            
             plot = plot_areas(areas, insect_name)
             if plot:
                 st.pyplot(plot)
             else:
                 st.write("No significant areas detected for", insect_name)
         
+        # Display results as a table
+        df = pd.DataFrame(results)
+        st.table(df)
+        
         # Preparing data for the stacked bar plot
-        df = pd.DataFrame.from_dict(all_plants, orient='index').fillna(0).T
+        df_stacked = pd.DataFrame.from_dict(all_plants, orient='index').fillna(0).T
         fig, ax = plt.subplots(figsize=(15, 7))
         
         # Plotting stacked bars
-        df.plot(kind='bar', stacked=True, ax=ax, colormap='tab20')
+        df_stacked.plot(kind='bar', stacked=True, ax=ax, colormap='tab20')
         
         ax.set_xlabel('Plant Position')
         ax.set_ylabel('Total Area (mm²)')
@@ -113,6 +123,14 @@ def main():
         
         plt.tight_layout()
         st.pyplot(fig)
+        
+        # Download button for CSV
+        st.download_button(
+            label="Download data as CSV",
+            data=df.to_csv(index=False),
+            file_name='plant_areas.csv',
+            mime='text/csv',
+        )
 
 if __name__ == '__main__':
     main()

@@ -53,14 +53,14 @@ def calculate_area(mask, pixel_to_mm_ratio):
 def plot_areas(areas, insect_name):
     if not areas:
         return None  # Handle the case where no significant areas are found
-    plt.figure(figsize=(10, 5))
-    plt.bar(range(len(areas)), areas, color='green')
-    plt.xlabel('Sub-Plant Number')
-    plt.ylabel('Area (mm²)')
-    plt.title(f'Area of Each Sub-Plant for {insect_name}')
-    plt.grid(True)
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(range(len(areas)), areas, color='green')
+    ax.set_xlabel('Sub-Plant Number')
+    ax.set_ylabel('Area (mm²)')
+    ax.set_title(f'Area of Each Sub-Plant for {insect_name}')
+    ax.grid(True)
     plt.tight_layout()
-    return plt
+    return fig
 
 def extract_number_from_filename(filename):
     match = re.search(r'_0*(\d+)_', filename)
@@ -97,16 +97,16 @@ def main():
                 st.write("No significant areas detected for", insect_name)
         
         # Plotting comparative graph for all plants
-        plt.figure(figsize=(15, 7))
+        fig, ax = plt.subplots(figsize=(15, 7))
         for idx, (name, areas) in enumerate(all_plants.items()):
-            plt.bar(idx, sum(areas), label=name, color=plt.cm.tab20(idx / len(all_plants)))
+            ax.bar(idx, sum(areas), label=name, color=plt.cm.tab20(idx / len(all_plants)))
         
-        plt.xlabel('Insect Name')
-        plt.ylabel('Total Area (mm²)')
-        plt.title('Comparative Total Area of Plants Across All Images')
-        plt.legend()
+        ax.set_xlabel('Insect Name')
+        ax.set_ylabel('Total Area (mm²)')
+        ax.set_title('Comparative Total Area of Plants Across All Images')
+        ax.legend()
         plt.tight_layout()
-        st.pyplot()
+        st.pyplot(fig)
 
 if __name__ == '__main__':
     main()

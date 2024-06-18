@@ -48,7 +48,8 @@ def detect_green_areas(image):
 
 def calculate_area(mask, pixel_to_mm_ratio):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    return [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) > 500]
+    areas = [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) > 1]  # Only consider areas > 1 mm²
+    return areas
 
 def plot_areas(areas, insect_name):
     plt.figure(figsize=(10, 5))
@@ -72,7 +73,7 @@ def main():
     uploaded_files = st.file_uploader("Choose images...", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
     pixel_to_mm_ratio = st.number_input('Enter the pixel to mm ratio:', min_value=0.01, max_value=100.0, value=8.43, step=0.01)
     
-    results = []  # To store results for table display and download
+    all_plants = {}  # Dictionary to store all plant areas by insect name
     
     if uploaded_files and st.button('Analyze'):
         for uploaded_file in uploaded_files:
@@ -85,25 +86,25 @@ def main():
             mask = detect_green_areas(image)
             areas = calculate_area(mask, pixel_to_mm_ratio)
             
-            for i, area in enumerate(areas):
-                sub_plant_label = f"{image_number}.{i+1}"
-                results.append({"Insect Name": insect_name, f"Sub-Plant {sub_plant_label} Area (mm²)": area})
+            if insect_name not in all_plants:
+                all_plants[insect_name] = []
+            all_plants[insect_name].extend(areas)
             
             if areas:
                 plot = plot_areas(areas, insect_name)
                 st.pyplot(plot)
         
-        # Display results as a table
-        df = pd.DataFrame(results)
-        st.table(df)
+        # Plotting comparative graph for all plants
+        plt.figure(figsize=(15, 7))
+        for idx, (name, areas) in enumerate(all_plants.items()):
+            plt.bar(idx, sum(areas), label=name, color=plt.cm.tab20(idx / len(all_plants)))
         
-        # Download button for CSV
-        st.download_button(
-            label="Download data as CSV",
-            data=df.to_csv(index=False),
-            file_name='plant_areas.csv',
-            mime='text/csv',
-        )
+        plt.xlabel('Insect Name')
+        plt.ylabel('Total Area (mm²)')
+        plt.title('Comparative Total Area of Plants Across All Images')
+        plt.legend()
+        plt.tight_layout()
+        st.pyplot()
 
 if __name__ == '__main__':
     main()

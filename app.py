@@ -48,10 +48,11 @@ def detect_green_areas(image):
 
 def calculate_area(mask, pixel_to_mm_ratio):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    areas = [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) > 1e7]  # Only consider areas > 1e7 mm²
-    return areas
+    return [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) > 1e7]
 
 def plot_areas(areas, insect_name):
+    if not areas:
+        return None  # Handle the case where no significant areas are found
     plt.figure(figsize=(10, 5))
     plt.bar(range(len(areas)), areas, color='green')
     plt.xlabel('Sub-Plant Number')
@@ -73,9 +74,8 @@ def main():
     uploaded_files = st.file_uploader("Choose images...", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
     pixel_to_mm_ratio = st.number_input('Enter the pixel to mm ratio:', min_value=0.01, max_value=100.0, value=8.43, step=0.01)
     
-    all_plants = {}  # Dictionary to store all plant areas by insect name
-    
     if uploaded_files and st.button('Analyze'):
+        all_plants = {}  # Dictionary to store all plant areas by insect name
         for uploaded_file in uploaded_files:
             image_number = extract_number_from_filename(uploaded_file.name)
             insect_name = insect_names.get(image_number, "Unknown Insect")
@@ -90,9 +90,11 @@ def main():
                 all_plants[insect_name] = []
             all_plants[insect_name].extend(areas)
             
-            if areas:
-                plot = plot_areas(areas, insect_name)
+            plot = plot_areas(areas, insect_name)
+            if plot:
                 st.pyplot(plot)
+            else:
+                st.write("No significant areas detected for", insect_name)
         
         # Plotting comparative graph for all plants
         plt.figure(figsize=(15, 7))

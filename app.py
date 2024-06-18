@@ -72,20 +72,35 @@ def main():
     uploaded_files = st.file_uploader("Choose images...", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
     pixel_to_mm_ratio = st.number_input('Enter the pixel to mm ratio:', min_value=0.01, max_value=100.0, value=8.43, step=0.01)
     
+    all_areas = []  # To store areas from all images for cumulative graph
+    names = []  # To store names for labels on cumulative graph
+    
     if uploaded_files and st.button('Analyze'):
         for uploaded_file in uploaded_files:
             image_number = extract_number_from_filename(uploaded_file.name)
             insect_name = insect_names.get(image_number, "Unknown Insect")
+            names.append(insect_name)
             
             image = load_image(uploaded_file)
             st.image(image, caption=f'Uploaded Image: {insect_name}', use_column_width=True)
             
             mask = detect_green_areas(image)
             areas = calculate_area(mask, pixel_to_mm_ratio)
+            all_areas.append(sum(areas))  # Sum areas for each image and append
             
             if areas:
                 plot = plot_areas(areas, insect_name)
                 st.pyplot(plot)
+        
+        # Plot cumulative graph at the end
+        plt.figure(figsize=(15, 7))
+        plt.bar(names, all_areas, color='blue')
+        plt.xlabel('Insect Name')
+        plt.ylabel('Total Area (mm²)')
+        plt.title('Comparative Total Area of Plants Across All Images')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        st.pyplot()
 
 if __name__ == '__main__':
     main()

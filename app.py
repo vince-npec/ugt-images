@@ -70,42 +70,57 @@ def extract_number_from_filename(filename):
         return int(match.group(1))
     return None
 
+def process_images(image_files, pixel_to_mm_ratio):
+    all_plants = {}  # Dictionary to store all plant areas by insect name
+    results = []  # List to store results for the table
+
+    for image_file in image_files:
+        filename = image_file.name
+        image_number = extract_number_from_filename(filename)
+        insect_name = insect_names.get(image_number, "Unknown Insect")
+        
+        image = load_image(image_file)
+        st.image(image, caption=f'Uploaded Image: {insect_name}', use_column_width=True)
+        
+        mask = detect_green_areas(image)
+        areas = calculate_area(mask, pixel_to_mm_ratio)
+        
+        if insect_name not in all_plants:
+            all_plants[insect_name] = []
+        all_plants[insect_name].extend(areas)
+        
+        for i, area in enumerate(areas):
+            sub_plant_label = f"{image_number}.{i+1}"
+            results.append({"Insect Name": insect_name, f"Sub-Plant {sub_plant_label} Area (mm²)": area})
+        
+        plot = plot_areas(areas, insect_name)
+        if plot:
+            st.pyplot(plot)
+        else:
+            st.write("No significant areas detected for", insect_name)
+    
+    return results, all_plants
+
 def main():
     st.title('Leaf Area Analysis Tool')
     
-    uploaded_file = st.file_uploader("Choose a zip file with 20 images...", type=['zip'])
+    uploaded_files = st.file_uploader("Choose images or a zip file...", type=['jpg', 'jpeg', 'png', 'zip'], accept_multiple_files=True)
     pixel_to_mm_ratio = st.number_input('Enter the pixel to mm ratio:', min_value=0.01, max_value=100.0, value=8.43, step=0.01)
     
-    if uploaded_file and st.button('Analyze'):
-        all_plants = {}  # Dictionary to store all plant areas by insect name
-        results = []  # List to store results for the table
+    if uploaded_files and st.button('Analyze'):
+        image_files = []
 
-        with zipfile.ZipFile(uploaded_file) as z:
-            for filename in z.namelist():
-                if filename.endswith(('.jpg', '.jpeg', '.png')):
-                    with z.open(filename) as image_file:
-                        image_number = extract_number_from_filename(filename)
-                        insect_name = insect_names.get(image_number, "Unknown Insect")
-                        
-                        image = load_image(image_file)
-                        st.image(image, caption=f'Uploaded Image: {insect_name}', use_column_width=True)
-                        
-                        mask = detect_green_areas(image)
-                        areas = calculate_area(mask, pixel_to_mm_ratio)
-                        
-                        if insect_name not in all_plants:
-                            all_plants[insect_name] = []
-                        all_plants[insect_name].extend(areas)
-                        
-                        for i, area in enumerate(areas):
-                            sub_plant_label = f"{image_number}.{i+1}"
-                            results.append({"Insect Name": insect_name, f"Sub-Plant {sub_plant_label} Area (mm²)": area})
-                        
-                        plot = plot_areas(areas, insect_name)
-                        if plot:
-                            st.pyplot(plot)
-                        else:
-                            st.write("No significant areas detected for", insect_name)
+        for uploaded_file in uploaded_files:
+            if uploaded_file.name.endswith('.zip'):
+                with zipfile.ZipFile(uploaded_file) as z:
+                    for filename in z.namelist():
+                        if filename.endswith(('.jpg', '.jpeg', '.png')):
+                            with z.open(filename) as image_file:
+                                image_files.append(BytesIO(image_file.read()))
+            else:
+                image_files.append(uploaded_file)
+        
+        results, all_plants = process_images(image_files, pixel_to_mm_ratio)
         
         # Display results as a table
         df = pd.DataFrame(results)

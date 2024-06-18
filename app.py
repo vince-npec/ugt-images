@@ -18,17 +18,28 @@ def detect_green_areas(image):
     upper_green = np.array([85, 255, 255])
     mask = cv2.inRange(hsv_image, lower_green, upper_green)
     
-    # Clean up the mask
+    # Clean up the mask using advanced morphological operations
     kernel = np.ones((5, 5), np.uint8)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-    mask = cv2.dilate(mask, kernel, iterations=3)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    mask = cv2.medianBlur(mask, 5)  # Apply median blur
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
     
     return mask
 
 def calculate_area(mask, pixel_to_mm_ratio):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     areas = [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) > 500]
-    return areas
+    return areas, contours
+
+def plot_areas(areas):
+    plt.figure(figsize=(10, 5))
+    plt.bar(range(len(areas)), areas, color='green')
+    plt.xlabel('Plant Number')
+    plt.ylabel('Area (mm²)')
+    plt.title('Area of Each Plant')
+    plt.grid(True)
+    plt.tight_layout()
+    return plt
 
 def main():
     st.title('Leaf Area Analysis Tool')
@@ -42,11 +53,13 @@ def main():
         
         if st.button('Analyze'):
             mask = detect_green_areas(image)
-            areas = calculate_area(mask, pixel_to_mm_ratio)
+            areas, _ = calculate_area(mask, pixel_to_mm_ratio)
             
             # Display results
-            st.image(mask, caption='Green Mask', use_column_width=True)
-            st.write(f"Total leaf areas in mm²: {areas}")
+            st.image(mask, caption='Processed Mask for Green Areas', use_column_width=True)
+            if areas:
+                plot = plot_areas(areas)
+                st.pyplot(plot)
 
 if __name__ == '__main__':
     main()

@@ -103,10 +103,14 @@ def main():
         # Plotting stacked bars
         df.plot(kind='bar', stacked=True, ax=ax, colormap='tab20')
         
-        ax.set_xlabel('Insect Name')
+        ax.set_xlabel('Plant Position')
         ax.set_ylabel('Total Area (mm²)')
         ax.set_title('Comparative Total Area of Plants Across All Images')
         ax.legend(title='Insect Name')
+        
+        # Custom x-axis labels
+        ax.set_xticklabels(['Left Plant', 'Right Plant'], rotation=0)
+        
         plt.tight_layout()
         st.pyplot(fig)
 

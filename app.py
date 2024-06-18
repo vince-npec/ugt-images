@@ -3,6 +3,31 @@ import cv2
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
+import re
+
+# Define the mapping from file numbers to insect names
+insect_names = {
+    0: "Ulysses",
+    1: "Admiral",
+    2: "Scarab",
+    3: "Ladybug",
+    4: "Yellowjacket",
+    5: "Flea",
+    6: "Mosquito",
+    7: "Stag beetle",
+    8: "Cockroach",
+    9: "Termite",
+    10: "Centipede",
+    11: "Fly",
+    12: "Giraffe",
+    13: "Tarantula",
+    14: "Fire bug",
+    15: "Tick",
+    16: "Moth",
+    17: "Millipede",
+    18: "Mantis",
+    19: "Dragonfly"
+}
 
 def load_image(image_file):
     return Image.open(image_file)
@@ -31,25 +56,34 @@ def calculate_area(mask, pixel_to_mm_ratio):
     areas = [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) > 500]
     return areas, contours
 
-def plot_areas(areas):
+def plot_areas(areas, insect_name):
     plt.figure(figsize=(10, 5))
     plt.bar(range(len(areas)), areas, color='green')
     plt.xlabel('Plant Number')
     plt.ylabel('Area (mm²)')
-    plt.title('Area of Each Plant')
+    plt.title(f'Area of Each Plant for {insect_name}')
     plt.grid(True)
     plt.tight_layout()
     return plt
+
+def extract_number_from_filename(filename):
+    match = re.search(r'_0*(\d+)_', filename)
+    if match:
+        return int(match.group(1))
+    return None
 
 def main():
     st.title('Leaf Area Analysis Tool')
     
     uploaded_file = st.file_uploader("Choose an image...", type=['jpg', 'jpeg', 'png'])
     if uploaded_file is not None:
-        image = load_image(uploaded_file)
-        st.image(image, caption='Uploaded Image', use_column_width=True)
+        image_number = extract_number_from_filename(uploaded_file.name)
+        insect_name = insect_names.get(image_number, "Unknown Insect")
         
-        pixel_to_mm_ratio = st.number_input('Enter the pixel to mm ratio:', min_value=0.01, max_value=10.0, value=1.0, step=0.01)
+        image = load_image(uploaded_file)
+        st.image(image, caption=f'Uploaded Image: {insect_name}', use_column_width=True)
+        
+        pixel_to_mm_ratio = st.number_input('Enter the pixel to mm ratio:', min_value=0.01, max_value=100.0, value=8.43, step=0.01)
         
         if st.button('Analyze'):
             mask = detect_green_areas(image)
@@ -58,7 +92,7 @@ def main():
             # Display results
             st.image(mask, caption='Processed Mask for Green Areas', use_column_width=True)
             if areas:
-                plot = plot_areas(areas)
+                plot = plot_areas(areas, insect_name)
                 st.pyplot(plot)
 
 if __name__ == '__main__':

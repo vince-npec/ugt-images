@@ -48,7 +48,8 @@ def detect_green_areas(image):
 
 def calculate_area(mask, pixel_to_mm_ratio):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    return [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) > 500]
+    areas = [cv2.contourArea(cnt) * (pixel_to_mm_ratio ** 2) for cnt in contours if cv2.contourArea(cnt) > 500]
+    return areas
 
 def extract_number_from_filename(filename):
     match = re.search(r'_0*(\d+)_', filename)
@@ -59,4 +60,47 @@ def extract_number_from_filename(filename):
 def main():
     st.title('Leaf Area Analysis Tool')
     
-    uploaded_files = st.file_uploader("Choose images...", type=['jpg', 'jpeg', 'png'], accept_multiple_files
+    uploaded_files = st.file_uploader("Choose images...", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
+    pixel_to_mm_ratio = st.number_input('Enter the pixel to mm ratio:', min_value=0.01, max_value=100.0, value=8.43, step=0.01)
+    
+    results = []  # To store results for table display and download
+    
+    if uploaded_files and st.button('Analyze'):
+        for uploaded_file in uploaded_files:
+            image_number = extract_number_from_filename(uploaded_file.name)
+            insect_name = insect_names.get(image_number, "Unknown Insect")
+            
+            image = load_image(uploaded_file)
+            st.image(image, caption=f'Uploaded Image: {insect_name}', use_column_width=True)
+            
+            mask = detect_green_areas(image)
+            areas = calculate_area(mask, pixel_to_mm_ratio)
+            
+            for i, area in enumerate(areas):
+                results.append({"Insect Name": insect_name, f"Sub-Plant {i+1} Area (mm²)": area})
+            
+            if areas:
+                plot = plot_areas(areas, insect_name)
+                st.pyplot(plot)
+        
+        # Display results as a table
+        df = pd.DataFrame(results)
+        st.table(df)
+        
+        # Download buttons for CSV and Excel
+        st.download_button(
+            label="Download data as CSV",
+            data=df.to_csv(index=False),
+            file_name='plant_areas.csv',
+            mime='text/csv',
+        )
+        
+        st.download_button(
+            label="Download data as Excel",
+            data=df.to_excel(index=False, engine='openpyxl'),
+            file_name='plant_areas.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+if __name__ == '__main__':
+    main()

@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
@@ -87,19 +87,12 @@ def main():
         df = pd.DataFrame(results)
         st.table(df)
         
-        # Download buttons for CSV and Excel
+        # Download button for CSV
         st.download_button(
             label="Download data as CSV",
             data=df.to_csv(index=False),
             file_name='plant_areas.csv',
             mime='text/csv',
-        )
-        
-        st.download_button(
-            label="Download data as Excel",
-            data=df.to_excel(index=False, engine='openpyxl'),
-            file_name='plant_areas.xlsx',
-            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
 
 if __name__ == '__main__':

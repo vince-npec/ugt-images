@@ -5,6 +5,8 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import re
 import pandas as pd
+import zipfile
+from io import BytesIO
 
 # Define the mapping from file numbers to insect names
 insect_names = {
@@ -71,36 +73,39 @@ def extract_number_from_filename(filename):
 def main():
     st.title('Leaf Area Analysis Tool')
     
-    uploaded_files = st.file_uploader("Choose images...", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
+    uploaded_file = st.file_uploader("Choose a zip file with 20 images...", type=['zip'])
     pixel_to_mm_ratio = st.number_input('Enter the pixel to mm ratio:', min_value=0.01, max_value=100.0, value=8.43, step=0.01)
     
-    if uploaded_files and st.button('Analyze'):
+    if uploaded_file and st.button('Analyze'):
         all_plants = {}  # Dictionary to store all plant areas by insect name
         results = []  # List to store results for the table
-        
-        for uploaded_file in uploaded_files:
-            image_number = extract_number_from_filename(uploaded_file.name)
-            insect_name = insect_names.get(image_number, "Unknown Insect")
-            
-            image = load_image(uploaded_file)
-            st.image(image, caption=f'Uploaded Image: {insect_name}', use_column_width=True)
-            
-            mask = detect_green_areas(image)
-            areas = calculate_area(mask, pixel_to_mm_ratio)
-            
-            if insect_name not in all_plants:
-                all_plants[insect_name] = []
-            all_plants[insect_name].extend(areas)
-            
-            for i, area in enumerate(areas):
-                sub_plant_label = f"{image_number}.{i+1}"
-                results.append({"Insect Name": insect_name, f"Sub-Plant {sub_plant_label} Area (mm²)": area})
-            
-            plot = plot_areas(areas, insect_name)
-            if plot:
-                st.pyplot(plot)
-            else:
-                st.write("No significant areas detected for", insect_name)
+
+        with zipfile.ZipFile(uploaded_file) as z:
+            for filename in z.namelist():
+                if filename.endswith(('.jpg', '.jpeg', '.png')):
+                    with z.open(filename) as image_file:
+                        image_number = extract_number_from_filename(filename)
+                        insect_name = insect_names.get(image_number, "Unknown Insect")
+                        
+                        image = load_image(image_file)
+                        st.image(image, caption=f'Uploaded Image: {insect_name}', use_column_width=True)
+                        
+                        mask = detect_green_areas(image)
+                        areas = calculate_area(mask, pixel_to_mm_ratio)
+                        
+                        if insect_name not in all_plants:
+                            all_plants[insect_name] = []
+                        all_plants[insect_name].extend(areas)
+                        
+                        for i, area in enumerate(areas):
+                            sub_plant_label = f"{image_number}.{i+1}"
+                            results.append({"Insect Name": insect_name, f"Sub-Plant {sub_plant_label} Area (mm²)": area})
+                        
+                        plot = plot_areas(areas, insect_name)
+                        if plot:
+                            st.pyplot(plot)
+                        else:
+                            st.write("No significant areas detected for", insect_name)
         
         # Display results as a table
         df = pd.DataFrame(results)

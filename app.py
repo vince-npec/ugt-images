@@ -7,9 +7,11 @@ import pandas as pd
 import os
 from datetime import datetime
 import plotly.express as px
+import zipfile
+from io import BytesIO
 
-# Define the mapping from file numbers to insect names
-insect_names = {
+# Define the mapping from file numbers to Ecotron names
+ecotron_names = {
     0: "Ulysses",
     1: "Admiral",
     2: "Scarab",
@@ -46,14 +48,14 @@ def load_image(image_file, crop_date_cutoff):
     return image
 
 # Function to detect green areas using HSV thresholding and morphological operations
-def detect_green_areas(image, insect_name=None, timepoint=None):
+def detect_green_areas(image, ecotron_name=None, timepoint=None):
     image = np.array(image)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
     # Apply more stringent thresholding for Centipede and Tick on 2024-06-21 11AM and 2024-06-20 11AM
-    if (insect_name == "Centipede" and timepoint == datetime(2024, 6, 21, 11)) or \
-       (insect_name == "Tick" and timepoint in [datetime(2024, 6, 21, 11), datetime(2024, 6, 20, 11)]):
+    if (ecotron_name == "Centipede" and timepoint == datetime(2024, 6, 21, 11)) or \
+       (ecotron_name == "Tick" and timepoint in [datetime(2024, 6, 21, 11), datetime(2024, 6, 20, 11)]):
         lower_green = np.array([30, 40, 40])
         upper_green = np.array([80, 255, 255])
     else:
@@ -90,7 +92,7 @@ def calculate_area(mask, pixel_to_mm_ratio):
         return [0, 0]
     return areas_cm2[:2]
 
-# Function to extract the insect number from the filename
+# Function to extract the ecotron number from the filename
 def extract_number_from_filename(filename):
     match = re.search(r'_0*(\d+)_', filename)
     if match:
@@ -118,23 +120,66 @@ def process_images(folder_path, pixel_to_mm_ratio, crop_date_cutoff):
                 if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
                     image_file_path = os.path.join(folder_full_path, filename)
                     image = load_image(image_file_path, crop_date_cutoff)
-                    insect_name = insect_names.get(extract_number_from_filename(filename), "Unknown Insect")
-                    if insect_name in devices_without_plants:
+                    ecotron_name = ecotron_names.get(extract_number_from_filename(filename), "Unknown Ecotron")
+                    if ecotron_name in devices_without_plants:
                         continue
-                    mask = detect_green_areas(image, insect_name, timepoint)
+                    mask = detect_green_areas(image, ecotron_name, timepoint)
                     areas = calculate_area(mask, pixel_to_mm_ratio)
-                    if insect_name not in image_mask_pairs:
-                        image_mask_pairs[insect_name] = []
-                    image_mask_pairs[insect_name].append((image, Image.fromarray(mask), timepoint))
+                    if ecotron_name not in image_mask_pairs:
+                        image_mask_pairs[ecotron_name] = []
+                    image_mask_pairs[ecotron_name].append((image, Image.fromarray(mask), timepoint))
                     for i, area in enumerate(areas):
                         results.append({
                             "Timepoint": timepoint,
-                            "Insect Name": insect_name,
-                            "Sub-Plant": f"{insect_name} {i+1}",
+                            "Ecotron": ecotron_name,
+                            "Sub-Plant": f"{ecotron_name} {i+1}",
                             "Total Area (cm²)": area
                         })
+
+    # Sort images chronologically for each Ecotron name
+    for ecotron_name in image_mask_pairs:
+        image_mask_pairs[ecotron_name].sort(key=lambda x: x[2])
+
     return results, image_mask_pairs
 
+# Function to process images from a zip file and extract relevant data
+def process_zip_file(zip_file, pixel_to_mm_ratio, crop_date_cutoff):
+    results = []
+    image_mask_pairs = {}
+    with zipfile.ZipFile(zip_file) as z:
+        for file_info in z.infolist():
+            if file_info.filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                with z.open(file_info) as image_file:
+                    image = load_image(image_file, crop_date_cutoff)
+                    filename = os.path.basename(file_info.filename)
+                    ecotron_name = ecotron_names.get(extract_number_from_filename(filename), "Unknown Ecotron")
+                    if ecotron_name in devices_without_plants:
+                        continue
+                    folder_date_str = os.path.basename(os.path.dirname(file_info.filename))
+                    timepoint = extract_timepoint_from_foldername(folder_date_str)
+                    if not timepoint:
+                        continue
+                    mask = detect_green_areas(image, ecotron_name, timepoint)
+                    areas = calculate_area(mask, pixel_to_mm_ratio)
+                    if ecotron_name not in image_mask_pairs:
+                        image_mask_pairs[ecotron_name] = []
+                    image_mask_pairs[ecotron_name].append((image, Image.fromarray(mask), timepoint))
+                    for i, area in enumerate(areas):
+                        results.append({
+                            "Timepoint": timepoint,
+                            "Ecotron": ecotron_name,
+                            "Sub-Plant": f"{ecotron_name} {i+1}",
+                            "Total Area (cm²)": area
+                        })
+
+    # Sort images chronologically for each Ecotron name
+    for ecotron_name in image_mask_pairs:
+        image_mask_pairs[ecotron_name].sort(key=lambda x: x[2])
+
+    return results, image_mask_pairs
+
+# Function to plot the growth over time
+def plot_growth_over_time(df):
 # Function to plot the growth over time
 def plot_growth_over_time(df):
     fig = px.line(df, x='Timepoint', y='Total Area (cm²)', color='Sub-Plant', markers=True, line_shape='linear')
@@ -155,8 +200,8 @@ def plot_total_growth_per_day(df):
 
 # Function to plot the total size of plants in each device over time
 def plot_total_growth_per_device(df):
-    df_sum = df.groupby(['Timepoint', 'Insect Name'])['Total Area (cm²)'].sum().reset_index()
-    fig = px.line(df_sum, x='Timepoint', y='Total Area (cm²)', color='Insect Name', markers=True, line_shape='linear')
+    df_sum = df.groupby(['Timepoint', 'Ecotron'])['Total Area (cm²)'].sum().reset_index()
+    fig = px.line(df_sum, x='Timepoint', y='Total Area (cm²)', color='Ecotron', markers=True, line_shape='linear')
     fig.update_layout(
         title='Total Size of Plants in Each Device Over Time',
         xaxis_title='Timepoint',
@@ -168,6 +213,44 @@ def main():
     st.set_page_config(layout="wide")
     st.title('Leaf Area Analysis Tool')
 
-    folder_path = "/Users/viniciuslube/Desktop/NPEC/2024/Ecotron/Datasets/Timelapse"
+    uploaded_file = st.file_uploader("Upload a zip file with photos", type=['zip'])
     pixel_to_mm_ratio = st.number_input('Enter the pixel to mm ratio:', min_value=0.01, max_value=100.0, value=0.12, step=0.01)
-    crop_date_cut
+    crop_date_cutoff = datetime(2024, 6, 21, 11)
+
+    if uploaded_file and st.button('Analyze'):
+        with st.spinner('Processing images...'):
+            with BytesIO(uploaded_file.read()) as zip_file:
+                results, image_mask_pairs = process_zip_file(zip_file, pixel_to_mm_ratio, crop_date_cutoff)
+            st.success('Processing complete!')
+            df = pd.DataFrame(results)
+
+            # Plot growth analysis
+            if not df.empty:
+                total_growth_device_fig = plot_total_growth_per_device(df)
+                st.plotly_chart(total_growth_device_fig)
+                
+                total_growth_fig = plot_total_growth_per_day(df)
+                st.plotly_chart(total_growth_fig)
+                
+                growth_fig = plot_growth_over_time(df)
+                st.plotly_chart(growth_fig)
+            
+            # Display results as a table
+            st.subheader("Detailed Results Table")
+            if not df.empty:
+                df = df.sort_values(by=['Ecotron', 'Timepoint'])
+                st.table(df)
+                st.download_button("Download data as CSV", df.to_csv(index=False), "plant_areas.csv", "text/csv")
+
+        # Create expanders for each timepoint and display image and segmentation mask
+        for ecotron_name, images_masks in image_mask_pairs.items():
+            for image, mask, timepoint in images_masks:
+                with st.expander(f"{ecotron_name} - {timepoint.strftime('%Y-%m-%d %I%p')}"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.image(image, caption=f"Original Image ({ecotron_name})", use_column_width=True)
+                    with col2:
+                        st.image(mask, caption=f"Segmentation Mask ({ecotron_name})", use_column_width=True)
+
+if __name__ == '__main__':
+    main()

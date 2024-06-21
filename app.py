@@ -53,9 +53,9 @@ def detect_green_areas(image, ecotron_name=None, timepoint=None):
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    # Apply more stringent thresholding for Centipede and Tick on 2024-06-21 11AM and 2024-06-20 11AM
-    if (ecotron_name == "Centipede" and timepoint == datetime(2024, 6, 21, 11)) or \
-       (ecotron_name == "Tick" and timepoint in [datetime(2024, 6, 21, 11), datetime(2024, 6, 20, 11)]):
+    # Apply more stringent thresholding for specific ecotrons and timepoints
+    stringent_ecotrons = ["Centipede", "Tick", "Mantis", "Millipede", "Termite", "Moth"]
+    if ecotron_name in stringent_ecotrons and timepoint in [datetime(2024, 6, 21, 11), datetime(2024, 6, 20, 11)]:
         lower_green = np.array([30, 40, 40])
         upper_green = np.array([80, 255, 255])
     else:
@@ -178,8 +178,6 @@ def process_zip_file(zip_file, pixel_to_mm_ratio, crop_date_cutoff):
 
     return results, image_mask_pairs
 
-# Function to plot the growth over time
-def plot_growth_over_time(df):
 # Function to plot the growth over time
 def plot_growth_over_time(df):
     fig = px.line(df, x='Timepoint', y='Total Area (cm²)', color='Sub-Plant', markers=True, line_shape='linear')
